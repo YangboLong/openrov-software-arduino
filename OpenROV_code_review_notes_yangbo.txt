@@ -1,0 +1,50 @@
+a). NArduinoManager
+    1. Watchdog timer settings, refer to page 61 of datasheet;
+    2. I2C communication utilizes a modified Arduino Wire library, which is ported as CI2C.cpp and CI2C.h;
+    3. ISR(WDT_vect): http://forum.arduino.cc/index.php?topic=133277.msg1002913#msg1002913 (why does the code need to use watchdog? can it be disabled?)
+    
+b). NCommManager and class CCommand
+    1. Stores and updates a global CCommand object with commands coming from the Beaglebone over UART;
+    2. In CCommand.cpp, GetSerialString() reads commands sent from BBB, check the validity of commands; if valid, save C-string to dataBuffer and return true, otherwise (serial data unavailable, or command length larger than 80), return false;
+    3. To parse the received command, a checksum method CRC8() is used to validate data, refer to: http://www.leonardomiliani.com/en/2013/un-semplice-crc8-per-arduino/
+    4. String separation function strtok: http://c.biancheng.net/cpp/html/175.html
+    5. Parse() takes a received command and splits it to be the command text (chars) and the command parameter (int), stores them to m_text and m_arguments respectively;
+    6. PushCommand records up to 5 accumulated commands, in which head indicates the newest;
+    7. In function GetCommandString(), if there is no valid command received/parsed currently, check the head and tail pointers to see if there is any pushed command; if there are pushed commands, take the oldest one by the tail pointer and print it.
+
+c). NConfigManager
+    1. Interface to vehicle/board settings shared by multiple subsystems within the code;
+    2. In HandleMessages, check what command is received from pilot and update/print settings accordingly.
+    
+d). NModuleManager and class CModule
+    1. Registration, initialization and update of modules derived from class CModule;
+    2. Up to 15 modules, pointed by m_pModules, can be registered and updated;
+    3. Processing time of updating each module is recorded.
+    
+e). NDataManager
+    1. Update/transmit data to beaglebone, which include shared data (1 hz) and nav data (10 hz).
+
+f). CControllerBoard
+    1. Setup object i2cpower to be a digital output pin of pin #48;
+    2. When initializing, reset timers and record the current and last time readings, pull up I2C power in Initialize(), and initialize analog input readings to be 0;
+    3. When updating, every 100 ms takes voltage readings and compute moving average (numReadings is 1, so actually it's the raw data), and then convert voltage readings to range of [0, 2]; every 1 sec displays the voltage, current and temparature readings (what do the SC1I, BRDV ect. represents exactly? how are the upper range values 20, 10, 2 etc. determined when transforming from votage readings to current values?); every 100 ms updates cape data.
+    
+g). CThrusters
+    1. Controls mixer and motor driving (details not checked out yet);
+    2. What are the CMotor class variables m_positiveModifier etc., as well as the various modes in the Update() function of CThrusters like mtrmod1 ect?
+
+h). CAutopilot_STD
+    1. Provides basic depth and heading hold functionality and communicates commands to CThruster module;
+    2. Initialize() resets timer; P control is applied for depth control and I control for heading control (why is integral control, also don't see anti-windup, a.k.a., hdg_Error_Integral has no upper bound) with hard-coded gains;
+    3. Whenever enters the headlon mode, tries to maintain the current heading; so does the depth control;
+    4. Every 50 ms controls motors once, with the "lift" and the "yaw" commands pushed.
+    
+i). MPU9150 (details to be checked out later)
+    1. Ported libraries refer to: https://github.com/zeran/MPU9150Lib, IMU update rate 20 Hz and mag 10 Hz;
+    2. By the end of https://github.com/zeran/MPU9150Lib/blob/master/MPU9150Lib.pdf, it states that the acc and gyro data have been fused by MPU9150. But I remember that only raw sensor data were obtained when I was using the IMU.
+    
+j). CPIDController
+    1. It seems to be not used yet (do roll and pitch need to be controlled?). 
+
+
+    
